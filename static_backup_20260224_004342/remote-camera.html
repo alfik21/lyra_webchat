@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lyra — Zdalna kamerka / mikrofon</title>
+    <style>
+      :root {
+        --bg: #fff7e6;
+        --card: #ffffff;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --accent: #f59e0b;
+        --accent2: #fb923c;
+        --border: rgba(31, 41, 55, 0.15);
+      }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell,
+          Noto Sans, Helvetica, Arial, sans-serif;
+        color: var(--ink);
+        background: radial-gradient(
+            900px circle at 10% 0%,
+            rgba(255, 236, 179, 0.8),
+            transparent 60%
+          ),
+          radial-gradient(
+            900px circle at 90% 100%,
+            rgba(251, 146, 60, 0.18),
+            transparent 60%
+          ),
+          var(--bg);
+        padding: 18px;
+      }
+      .wrap {
+        max-width: 920px;
+        margin: 0 auto;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        font-size: 20px;
+        margin: 0 0 8px 0;
+      }
+      p {
+        margin: 0 0 12px 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-top: 12px;
+      }
+      @media (min-width: 900px) {
+        .grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        border: 1px solid rgba(0, 0, 0, 0.12);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: #fff;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn.primary {
+        border-color: rgba(245, 158, 11, 0.6);
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: #111827;
+      }
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+      }
+      .field {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px 14px;
+        background: #fff;
+      }
+      .field input {
+        border: none;
+        outline: none;
+        font-weight: 600;
+        width: min(520px, 80vw);
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+          'Liberation Mono', 'Courier New', monospace;
+      }
+      pre {
+        margin: 10px 0 0 0;
+        padding: 12px;
+        border-radius: 12px;
+        background: #0b1220;
+        color: #e5e7eb;
+        overflow: auto;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+      .ok {
+        color: #065f46;
+        font-weight: 700;
+      }
+      .err {
+        color: #991b1b;
+        font-weight: 700;
+      }
+      small {
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Lyra — zdalna kamerka / mikrofon</h1>
+        <p>
+          Ta strona służy do wrzucania zdjęć lub nagrań z telefonu (albo innego
+          urządzenia) do Lyry. Jeśli na komputerze masz otwarty czat Lyry
+          (11447), powinno wpaść automatycznie. Poniżej jest też tekst do
+          wklejenia awaryjnie.
+        </p>
+        <div class="row" style="margin: 10px 0 2px 0">
+          <div class="field">
+            <span class="mono">Token (opcjonalnie):</span>
+            <input id="token" type="text" placeholder="Jeśli ustawiono LYRA_REMOTE_TOKEN" />
+          </div>
+        </div>
+        <small>
+          Jeśli serwer ma ustawiony <span class="mono">LYRA_REMOTE_TOKEN</span>, wpisz go wyżej.
+        </small>
+
+        <div class="grid">
+          <div class="card">
+            <h1>Wiadomość</h1>
+            <p>Napisz krótką wiadomość i wyślij bez audio/zdjęć.</p>
+            <div class="row" style="align-items:stretch;">
+              <textarea id="msg" placeholder="Napisz..." style="flex:1;min-height:90px;padding:12px 14px;border-radius:12px;border:1px solid var(--border);font-weight:600;"></textarea>
+              <button class="btn primary" id="sendMsg">Wyślij</button>
+            </div>
+            <small>Tip: jeśli na PC czat jest otwarty, wiadomość wpadnie automatycznie.</small>
+          </div>
+
+          <div class="card">
+            <h1>Zdjęcie</h1>
+            <p>Zrób zdjęcie lub wybierz obraz i wyślij do Lyry.</p>
+            <div class="row">
+              <label class="btn primary" for="img">
+                Zrób zdjęcie / wybierz obraz
+              </label>
+              <input id="img" type="file" accept="image/*" capture="environment" hidden />
+              <button class="btn" id="sendImg" disabled>Wyślij</button>
+            </div>
+            <small id="imgInfo"></small>
+          </div>
+
+          <div class="card">
+            <h1>Audio</h1>
+            <p>Nagraj głos lub wybierz plik audio i wyślij do Lyry.</p>
+            <div class="row">
+              <label class="btn primary" for="aud">Nagraj / wybierz audio</label>
+              <input id="aud" type="file" accept="audio/*" capture hidden />
+              <button class="btn" id="sendAud" disabled>Wyślij</button>
+              <button class="btn" id="asrAud" disabled>Transkrybuj</button>
+            </div>
+            <small id="audInfo"></small>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top: 12px">
+          <h1>Wynik</h1>
+          <p>Powinno pojawić się w czacie na PC automatycznie. Skopiuj tylko jeśli trzeba.</p>
+          <div class="row">
+            <button class="btn" id="copy" disabled>Skopiuj</button>
+            <span id="status" class="mono"></span>
+          </div>
+          <pre id="out" class="mono">(tu pojawi się wynik)</pre>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const img = document.getElementById('img');
+      const aud = document.getElementById('aud');
+      const sendImg = document.getElementById('sendImg');
+      const sendAud = document.getElementById('sendAud');
+      const asrAud = document.getElementById('asrAud');
+      const imgInfo = document.getElementById('imgInfo');
+      const audInfo = document.getElementById('audInfo');
+      const out = document.getElementById('out');
+      const copyBtn = document.getElementById('copy');
+      const status = document.getElementById('status');
+      const tokenInput = document.getElementById('token');
+      const msg = document.getElementById('msg');
+      const sendMsg = document.getElementById('sendMsg');
+
+      let lastHint = '';
+      try {
+        const saved = localStorage.getItem('lyra_remote_token') || '';
+        tokenInput.value = saved;
+        tokenInput.addEventListener('input', () => {
+          localStorage.setItem('lyra_remote_token', tokenInput.value || '');
+        });
+      } catch {}
+
+      function fmtSize(n) {
+        if (!n && n !== 0) return '';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let v = n;
+        let i = 0;
+        while (v >= 1024 && i < units.length - 1) {
+          v /= 1024;
+          i++;
+        }
+        return `${v.toFixed(i ? 1 : 0)} ${units[i]}`;
+      }
+
+      function setStatus(text, kind) {
+        status.textContent = text;
+        status.className = `mono ${kind || ''}`;
+      }
+
+      async function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(r.result);
+          r.onerror = () => reject(new Error('Nie udało się odczytać pliku'));
+          r.readAsDataURL(file);
+        });
+      }
+
+      async function upload(kind, file) {
+        setStatus('Wysyłam…', '');
+        const dataUrl = await fileToDataUrl(file);
+        const token = (tokenInput && tokenInput.value ? tokenInput.value : '').trim();
+        const res = await fetch('/api/remote/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kind, data_url: dataUrl, token }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+          const msg = json && json.error ? json.error : 'Nieznany błąd';
+          throw new Error(msg);
+        }
+        return json;
+      }
+
+      async function sendText(text) {
+        setStatus('Wysyłam…', '');
+        const token = (tokenInput && tokenInput.value ? tokenInput.value : '').trim();
+        const res = await fetch('/api/remote/text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text, token }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+          const msg = json && json.error ? json.error : 'Nieznany błąd';
+          throw new Error(msg);
+        }
+        return json;
+      }
+
+      async function transcribe(file) {
+        setStatus('Transkrybuję…', '');
+        const dataUrl = await fileToDataUrl(file);
+        const res = await fetch('/api/asr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data_url: dataUrl, lang: 'pl' }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok || !json.ok) {
+          const msg = json && json.error ? json.error : 'Nieznany błąd ASR';
+          throw new Error(msg);
+        }
+        return (json.text || '').trim();
+      }
+
+      img.addEventListener('change', () => {
+        const f = img.files && img.files[0];
+        imgInfo.textContent = f ? `${f.name} (${fmtSize(f.size)})` : '';
+        sendImg.disabled = !f;
+      });
+      aud.addEventListener('change', () => {
+        const f = aud.files && aud.files[0];
+        audInfo.textContent = f ? `${f.name} (${fmtSize(f.size)})` : '';
+        sendAud.disabled = !f;
+        asrAud.disabled = !f;
+      });
+
+      sendImg.addEventListener('click', async () => {
+        const f = img.files && img.files[0];
+        if (!f) return;
+        try {
+          const json = await upload('image', f);
+          lastHint = json.chat_hint || '';
+          out.textContent = lastHint || '(brak)';
+          copyBtn.disabled = !lastHint;
+          setStatus('OK', 'ok');
+        } catch (e) {
+          setStatus('Błąd', 'err');
+          out.textContent = String(e && e.message ? e.message : e);
+          copyBtn.disabled = true;
+        }
+      });
+
+      sendAud.addEventListener('click', async () => {
+        const f = aud.files && aud.files[0];
+        if (!f) return;
+        try {
+          const json = await upload('audio', f);
+          lastHint = json.chat_hint || '';
+          out.textContent = lastHint || '(brak)';
+          copyBtn.disabled = !lastHint;
+          setStatus('OK', 'ok');
+        } catch (e) {
+          setStatus('Błąd', 'err');
+          out.textContent = String(e && e.message ? e.message : e);
+          copyBtn.disabled = true;
+        }
+      });
+
+      asrAud.addEventListener('click', async () => {
+        const f = aud.files && aud.files[0];
+        if (!f) return;
+        try {
+          const text = await transcribe(f);
+          lastHint = text || '';
+          out.textContent = lastHint || '(brak transkrypcji)';
+          copyBtn.disabled = !lastHint;
+          setStatus('OK', 'ok');
+        } catch (e) {
+          setStatus('Błąd', 'err');
+          out.textContent = String(e && e.message ? e.message : e);
+          copyBtn.disabled = true;
+        }
+      });
+
+      sendMsg.addEventListener('click', async () => {
+        const text = (msg && msg.value ? msg.value : '').trim();
+        if (!text) return;
+        try {
+          await sendText(text);
+          lastHint = text;
+          out.textContent = lastHint;
+          copyBtn.disabled = !lastHint;
+          setStatus('OK', 'ok');
+          msg.value = '';
+        } catch (e) {
+          setStatus('Błąd', 'err');
+          out.textContent = String(e && e.message ? e.message : e);
+          copyBtn.disabled = true;
+        }
+      });
+
+      copyBtn.addEventListener('click', async () => {
+        if (!lastHint) return;
+        try {
+          await navigator.clipboard.writeText(lastHint);
+          setStatus('Skopiowano', 'ok');
+        } catch {
+          setStatus('Skopiuj ręcznie', '');
+        }
+      });
+    </script>
+  </body>
+</html>

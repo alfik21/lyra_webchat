@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lyra – ustawienia</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --text:#e2e8f0; --muted:#94a3b8; --accent:#fb923c; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:"Inter","SF Pro Display",system-ui,sans-serif; display:flex; justify-content:center; padding:20px; }
+    .card { width:min(900px,100%); background:var(--panel); border:1px solid rgba(255,255,255,0.08); border-radius:16px; padding:18px; box-shadow:0 18px 40px rgba(0,0,0,0.35); }
+    h1 { margin:0 0 10px; font-size:1.2rem; }
+    h2 { margin:14px 0 8px; font-size:1rem; }
+    .nav { margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap; }
+    .nav a { text-decoration:none; color:var(--text); padding:6px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); }
+    .nav a:hover { border-color:var(--accent); color:var(--accent); }
+    select, input[type="text"], input[type="number"] { width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:var(--text); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    .pill { padding:6px 10px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); display:inline-flex; align-items:center; gap:6px; cursor:pointer; background:rgba(255,255,255,0.05); }
+    .pill.on { border-color:#22c55e; color:#22c55e; }
+    button { border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:700; background:linear-gradient(135deg,#0ea5e9,#22c55e); color:#0b1120; }
+    .log { margin-top:10px; padding:10px; border-radius:10px; background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.06); min-height:90px; white-space:pre-wrap; font-family:"JetBrains Mono",monospace; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="nav">
+      <a href="/">Czat</a>
+      <a href="/voice.html">Voice UI</a>
+      <a href="/voice">Live</a>
+      <a href="/remote-camera">Kamera</a>
+      <a href="/simple-chat.html">Prosty czat</a>
+      <a href="/tts-settings.html">👄 TTS</a>
+      <a href="/app">Nowa strona</a>
+    </div>
+    <h1>Ustawienia Lyry</h1>
+    <div class="row">
+      <div style="flex:1; min-width:220px;">
+        <h2>Tryb Lyry</h2>
+        <select id="inputMode">
+          <option value="chat">Chat</option>
+          <option value="auto">Auto</option>
+          <option value="informatyk">Informatyk</option>
+        </select>
+        <h2 style="margin-top:12px;">Poziomy</h2>
+        <label>Humor (1-5)</label>
+        <input type="number" id="humor" min="1" max="5" />
+        <label>Inteligencja (1-10)</label>
+        <input type="number" id="intel" min="1" max="10" />
+      </div>
+      <div style="flex:1; min-width:220px;">
+        <h2>Backend / model</h2>
+        <div class="pill" id="modeChat">Chat</div>
+        <div class="pill" id="modeAuto">Auto</div>
+        <div class="pill" id="modeInformatyk">Informatyk</div>
+        <h2 style="margin-top:12px;">Tools (włącz/wyłącz)</h2>
+        <div id="tools"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <button id="btnSave">Zapisz</button>
+      <button id="btnReload">Odśwież</button>
+      <span id="status" style="color:var(--muted); align-self:center;"></span>
+    </div>
+    <div class="log" id="log"></div>
+  </div>
+  <script>
+    const statusEl = document.getElementById("status");
+    const logBox = document.getElementById("log");
+    const inputMode = document.getElementById("inputMode");
+    const humor = document.getElementById("humor");
+    const intel = document.getElementById("intel");
+    const toolsBox = document.getElementById("tools");
+    const btnSave = document.getElementById("btnSave");
+    const btnReload = document.getElementById("btnReload");
+
+    function log(msg) {
+      const now = new Date().toLocaleTimeString();
+      logBox.textContent = `[${now}] ${msg}\n` + logBox.textContent;
+    }
+
+    async function fetchJson(path, opts={}) {
+      const resp = await fetch(path, opts);
+      const data = await resp.json();
+      return {resp, data};
+    }
+
+    function renderTools(list, enabled) {
+      toolsBox.innerHTML = '';
+      (list || []).forEach(key => {
+        const pill = document.createElement('div');
+        pill.className = 'pill' + (enabled.includes(key) ? ' on' : '');
+        pill.textContent = key;
+        pill.onclick = () => {
+          pill.classList.toggle('on');
+        };
+        toolsBox.appendChild(pill);
+      });
+    }
+
+    function currentTools() {
+      return Array.from(toolsBox.querySelectorAll('.pill.on')).map(el => el.textContent);
+    }
+
+    async function loadState() {
+      statusEl.textContent = "Ładuję...";
+      try {
+        const {data} = await fetchJson("/api/runtime/get");
+        const cfg = data.config || {};
+        inputMode.value = cfg.input_mode || "chat";
+        humor.value = cfg.humor_level || 3;
+        intel.value = cfg.intel_level || 5;
+        renderTools(data.tools_all || [], cfg.tools_allowed || []);
+        log("Załadowano config.json: " + JSON.stringify(cfg));
+      } catch (e) {
+        log("Błąd /api/runtime/get: " + e);
+      } finally {
+        statusEl.textContent = "";
+      }
+    }
+
+    async function saveState() {
+      statusEl.textContent = "Zapisuję...";
+      try {
+        const payload = {
+          input_mode: inputMode.value,
+          humor_level: parseInt(humor.value, 10) || 3,
+          intel_level: parseInt(intel.value, 10) || 5,
+          tools_allowed: currentTools(),
+        };
+        const {resp, data} = await fetchJson("/api/runtime/set", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload),
+        });
+        log("Zapis: " + resp.status + " " + JSON.stringify(data));
+      } catch (e) {
+        log("Błąd zapisu: " + e);
+      } finally {
+        statusEl.textContent = "";
+      }
+    }
+
+    btnSave.onclick = saveState;
+    btnReload.onclick = loadState;
+    loadState();
+  </script>
+</body>
+</html>

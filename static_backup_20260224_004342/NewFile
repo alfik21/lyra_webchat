@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lyra – ustawienia TTS (backend)</title>
+  <style>
+    :root { --bg:#0f172a; --panel:#111827; --text:#e2e8f0; --muted:#94a3b8; --accent:#fb923c; }
+    * { box-sizing: border-box; }
+    body {
+      margin:0; min-height:100vh; background:var(--bg); color:var(--text);
+      font-family:"Inter","SF Pro Display",system-ui,sans-serif;
+      display:flex; justify-content:center; padding:20px;
+    }
+    .card {
+      width:min(840px,100%); background:var(--panel);
+      border:1px solid rgba(255,255,255,0.08); border-radius:16px;
+      padding:18px; box-shadow:0 18px 40px rgba(0,0,0,0.35);
+    }
+    h1 { margin:0 0 10px; font-size:1.2rem; }
+    label { display:block; margin:8px 0 4px; color:var(--muted); font-weight:600; }
+    select, input[type="text"], input[type="number"] {
+      width:100%; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.05); color:var(--text);
+    }
+    textarea { width:100%; min-height:80px; border-radius:10px; border:1px solid rgba(255,255,255,0.2);
+      background:rgba(255,255,255,0.05); color:var(--text); padding:10px; resize:vertical; }
+    button {
+      border:none; border-radius:10px; padding:10px 14px; cursor:pointer; font-weight:700;
+      background:linear-gradient(135deg,#0ea5e9,#22c55e); color:#0b1120;
+    }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row button { flex:0 0 auto; }
+    .log { margin-top:10px; padding:10px; border-radius:10px; background:rgba(0,0,0,0.35);
+      border:1px solid rgba(255,255,255,0.06); min-height:90px; white-space:pre-wrap; font-family:"JetBrains Mono",monospace; }
+    .nav { margin-bottom:10px; display:flex; gap:8px; flex-wrap:wrap; }
+    .nav a { text-decoration:none; color:var(--text); padding:6px 10px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); }
+    .nav a:hover { border-color:var(--accent); color:var(--accent); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="nav">
+      <a href="/">Czat</a>
+      <a href="/voice.html">Voice UI</a>
+      <a href="/remote-camera">Kamera</a>
+      <a href="/simple-chat.html">Prosty czat</a>
+      <a href="/app">Nowa strona</a>
+    </div>
+    <h1>Ustawienia TTS (backend Lyry – Piper/RHVoice/espeak)</h1>
+    <p style="color:var(--muted); margin-top:0;">Łączy się z panelem na <code>http://127.0.0.1:11446/api/tts/...</code>. Wybierz silnik, głos i przetestuj.</p>
+
+    <label>Silnik</label>
+    <select id="engine"></select>
+
+    <label>Głos</label>
+    <select id="voice"></select>
+
+    <label>Prędkość (słowa/min) lub procent (dla niektórych silników)</label>
+    <input type="number" id="speed" value="160" min="50" max="400" />
+
+    <label>Wyjściowy plik WAV</label>
+    <input type="text" id="output" value="/tmp/lyra_tts.wav" />
+
+    <label>Tekst do testu</label>
+    <textarea id="sample">Cześć, tu Lyra. Sprawdzam syntezę mowy.</textarea>
+
+    <div class="row" style="margin-top:10px;">
+      <button id="btnRefresh">Odśwież listę głosów</button>
+      <button id="btnSave">Zapisz ustawienia</button>
+      <button id="btnTest">Odtwórz test</button>
+      <span id="status" style="color:var(--muted);"></span>
+    </div>
+
+    <audio id="player" controls style="width:100%; margin-top:10px;"></audio>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    const API_BASE = "http://127.0.0.1:11446/api/tts";
+    const engineSel = document.getElementById("engine");
+    const voiceSel = document.getElementById("voice");
+    const speedInput = document.getElementById("speed");
+    const outputInput = document.getElementById("output");
+    const sampleInput = document.getElementById("sample");
+    const logBox = document.getElementById("log");
+    const statusEl = document.getElementById("status");
+    const player = document.getElementById("player");
+
+    function log(msg) {
+      const now = new Date().toLocaleTimeString();
+      logBox.textContent = `[${now}] ${msg}\\n` + logBox.textContent;
+    }
+    async function fetchJson(path, opts={}) {
+      const resp = await fetch(API_BASE + path, opts);
+      const data = await resp.json();
+      return {resp, data};
+    }
+    async function loadState() {
+      statusEl.textContent = "Ładuję...";
+      try {
+        const {data} = await fetchJson("/get");
+        const tts = data.tts || {};
+        const engines = data.engines || [];
+        const voices = data.voices || {};
+        engineSel.innerHTML = engines.map(e => `<option value="${e}">${e}</option>`).join("");
+        engineSel.value = tts.engine || engines[0] || "auto";
+        rebuildVoices(voices, engineSel.value, tts.voice);
+        speedInput.value = tts.speed || 160;
+        outputInput.value = tts.output || "/tmp/lyra_tts.wav";
+        log("Załadowano TTS: " + JSON.stringify(tts));
+      } catch (e) {
+        log("Błąd ładowania /api/tts/get: " + e);
+      } finally {
+        statusEl.textContent = "";
+      }
+    }
+    function rebuildVoices(voices, engine, currentVoice) {
+      const list = voices[engine] || voices[engine?.split(':')[0]] || [];
+      voiceSel.innerHTML = list.map(v => `<option value="${v}">${v}</option>`).join("");
+      if (currentVoice && list.includes(currentVoice)) voiceSel.value = currentVoice;
+    }
+    async function saveState() {
+      statusEl.textContent = "Zapisuję...";
+      try {
+        const payload = {
+          engine: engineSel.value,
+          voice: voiceSel.value,
+          speed: parseInt(speedInput.value, 10) || undefined,
+          output: outputInput.value.trim(),
+        };
+        const {resp, data} = await fetchJson("/set", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload),
+        });
+        log("Zapis: " + resp.status + " " + JSON.stringify(data));
+      } catch (e) {
+        log("Błąd zapisu: " + e);
+      } finally {
+        statusEl.textContent = "";
+      }
+    }
+    async function testTts() {
+      statusEl.textContent = "Generuję...";
+      try {
+        const payload = {
+          engine: engineSel.value,
+          voice: voiceSel.value,
+          speed: parseInt(speedInput.value, 10) || undefined,
+          output: outputInput.value.trim(),
+          text: sampleInput.value.trim() || "Test TTS",
+        };
+        const {data} = await fetchJson("/test", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify(payload),
+        });
+        log("Test: " + JSON.stringify(data));
+        // Pobierz plik i odtwórz
+        const wav = await fetch(API_BASE + "/file");
+        if (wav.ok) {
+          const blob = await wav.blob();
+          player.src = URL.createObjectURL(blob);
+          player.play().catch(() => {});
+        } else {
+          log("Brak pliku WAV: status " + wav.status);
+        }
+      } catch (e) {
+        log("Błąd testu TTS: " + e);
+      } finally {
+        statusEl.textContent = "";
+      }
+    }
+
+    document.getElementById("btnRefresh").onclick = loadState;
+    document.getElementById("btnSave").onclick = saveState;
+    document.getElementById("btnTest").onclick = testTts;
+    engineSel.onchange = loadState;
+
+    loadState();
+  </script>
+</body>
+</html>

@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Lyra — rozmowa głosowa</title>
+    <style>
+      :root {
+        --bg: #030712;
+        --card: #0b1221;
+        --panel: #111b33;
+        --panel-muted: rgba(255, 255, 255, 0.05);
+        --accent: #fb923c;
+        --accent-strong: #f97316;
+        --danger: #ef4444;
+        --text: #f8fafc;
+        --muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.1);
+        font-family: "Inter", system-ui, sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: radial-gradient(circle at 20% 20%, rgba(251, 146, 60, 0.25), transparent 42%),
+          radial-gradient(circle at 80% 0%, rgba(14, 165, 233, 0.25), transparent 45%),
+          var(--bg);
+        color: var(--text);
+        min-height: 100vh;
+      }
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px;
+        display: flex;
+        justify-content: center;
+      }
+      .voice-card {
+        width: 100%;
+        background: linear-gradient(145deg, rgba(23, 35, 58, 0.95), rgba(12, 18, 36, 0.95));
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        padding: 28px;
+        box-shadow: 0 30px 60px rgba(0, 0, 0, 0.55);
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      h1,
+      h2,
+      label,
+      p {
+        margin: 0;
+      }
+      h1 {
+        font-size: clamp(1.6rem, 2vw, 2rem);
+      }
+      .btn {
+        border: none;
+        border-radius: 18px;
+        padding: 12px 20px;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: transform 0.2s ease;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+        color: #050911;
+      }
+      .primary[aria-pressed="true"] {
+        background: var(--danger);
+        color: #fff;
+      }
+      .secondary {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .panel {
+        margin-top: 20px;
+        background: rgba(5, 9, 17, 0.8);
+        border-radius: 18px;
+        padding: 18px 22px;
+        border: 1px solid var(--border);
+      }
+      .panel-grid {
+        display: grid;
+        gap: 16px;
+      }
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+      select,
+      input[type=range],
+      .slider-value,
+      button,
+      input[type=checkbox] + span {
+        font-family: inherit;
+      }
+      select,
+      input[type=range] {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        padding: 8px 10px;
+        color: var(--text);
+        accent-color: var(--accent);
+      }
+      .meter {
+        width: 100%;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        overflow: hidden;
+      }
+      .meter-fill {
+        height: 100%;
+        width: 0;
+        background: linear-gradient(135deg, #22c55e, #10b981);
+        transition: width 0.08s linear;
+      }
+      #logBox {
+        height: 180px;
+        overflow-y: auto;
+        background: rgba(0, 0, 0, 0.35);
+        border-radius: 14px;
+        padding: 12px;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+      .voice-log-panel,
+      #voice-chat-entries {
+        min-height: 150px;
+        max-height: 260px;
+        overflow-y: auto;
+        background: rgba(255, 0, 0, 0.12); /* diagnostycznie wyraźne tło */
+        border-radius: 12px;
+        padding: 10px;
+        font-family: "JetBrains Mono", Consolas, monospace;
+        font-size: 0.82rem;
+        line-height: 1.4;
+        border: 2px solid red; /* diagnostyczna ramka */
+        color: var(--text);
+        display: block;
+        box-sizing: border-box;
+      }
+      audio {
+        width: 100%;
+        margin-top: 16px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.05);
+      }
+      .status-pill {
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 0.85rem;
+      }
+      .filters {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+      }
+      .filter-control {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .filter-control label {
+        display: block;
+        font-size: 0.9rem;
+        margin-bottom: 6px;
+        color: var(--muted);
+      }
+      .filter-control .value {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .emote {
+        width: 54px;
+        height: 54px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin-left: auto;
+        color: var(--accent);
+        background: #0a1225;
+      }
+      @media (max-width: 768px) {
+        main {
+          padding: 16px;
+        }
+        .voice-card {
+          padding: 20px;
+        }
+        header {
+          flex-direction: column;
+        }
+        .row {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="voice-card">
+        <header>
+          <div>
+            <h1>Rozmowa głosowa z Lyrą</h1>
+            <p style="color: var(--muted); font-size: 0.95rem; max-width: 520px;">
+              Rozmawiaj jak przez telefon: hotword + manualne uruchamianie, personalizowany mikser filtrów i monitor
+              na żywo.
+            </p>
+          </div>
+          <div class="emote" id="emoteFace">🎧</div>
+        </header>
+        <div class="row" style="margin-top: 16px; gap: 12px;">
+          <button id="openMicBtn" class="btn primary" aria-pressed="false">🎙 Włącz mikrofon</button>
+          <div class="status-pill" id="stateLabel">Gotowe do nagrania</div>
+        </div>
+        <div class="row" style="margin-top: 12px; gap: 12px;">
+          <span style="color: var(--muted);">Długość wypowiedzi:</span>
+          <input id="durationSlider" type="range" min="2" max="1000" value="12" />
+          <span class="slider-value" id="durationValue">12 s</span>
+          <button class="btn secondary" id="muteBtn">Mute</button>
+        </div>
+        <div class="panel">
+          <h2 style="font-size: 1.1rem;">Sterowanie filtrami</h2>
+          <div class="filters">
+            <div class="filter-control">
+              <label>Redukcja szumów</label>
+              <div class="row" style="align-items: center;">
+                <input type="range" id="noiseSlider" min="0" max="100" value="60" />
+                <span class="value" id="noiseValue">60%</span>
+              </div>
+            </div>
+            <div class="filter-control">
+              <label>Echo</label>
+              <div class="row" style="align-items: center;">
+                <input type="range" id="echoSlider" min="0" max="100" value="40" />
+                <span class="value" id="echoValue">40%</span>
+              </div>
+            </div>
+            <div class="filter-control">
+              <label>AGC (automatyczne wzmocnienie)</label>
+              <div class="row" style="align-items: center;">
+                <input type="range" id="agcSlider" min="0" max="100" value="50" />
+                <span class="value" id="agcValue">50%</span>
+              </div>
+            </div>
+            <div class="filter-control">
+              <label>Maska tła (noise gate)</label>
+              <div class="row" style="align-items: center;">
+                <input type="range" id="gateSlider" min="0" max="100" value="35" />
+                <span class="value" id="gateValue">35%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="row" style="justify-content: space-between; align-items: center;">
+            <div>
+              <label for="ttsVoice" style="font-size: 0.9rem; color: var(--muted);">Wybór głosu TTS</label>
+              <select id="ttsVoice"></select>
+            </div>
+            <div>
+              <label style="font-size: 0.85rem; color: var(--muted);">Hotword</label>
+              <div class="row" style="gap: 8px;">
+                <input type="text" id="hotwordText" value="Hey Lyra" style="width: 160px;" />
+                <button class="btn secondary" id="hotwordTrain">Zapisz</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <h2 style="font-size: 1.1rem; margin-bottom: 12px;">S-metr przed Lyra</h2>
+          <div class="meter" aria-label="S-metr" role="img">
+            <div class="meter-fill" id="meterFill"></div>
+          </div>
+          <p style="color: var(--muted); font-size: 0.9rem; margin: 8px 0 0;">
+            Pokazuje filtrację sygnału z karty dźwiękowej po ustawieniach filtrów, przed wysłaniem do backendu.
+          </p>
+        </div>
+        <div class="panel" style="display:block;">
+          <div class="row" style="justify-content: space-between; align-items:center;">
+            <span>Logi rozmowy</span>
+            <button id="clearLog" class="btn secondary">Wyczyść</button>
+          </div>
+          <div id="logBox">Logi pojawią się tutaj.</div>
+          <h2 style="font-size: 1rem; margin: 12px 0 6px;">Panel pomocniczy</h2>
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <span style="font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; color: rgb(165, 180, 252);">Rozmowa głosowa</span>
+            <div id="voice-log-panel" class="voice-log-panel" aria-live="polite" style="display:block;">(Brak wpisów – logi rozmowy głosowej pojawią się tutaj.)</div>
+            <div id="voice-chat-entries" aria-live="polite">(Brak wpisów czatu głosowego)</div>
+          </div>
+        </div>
+        <audio id="player" controls></audio>
+      </div>
+    </main>
+    <script>
+      const toggleBtn = document.getElementById("openMicBtn");
+      const muteBtn = document.getElementById("muteBtn");
+      const logBox = document.getElementById("logBox");
+      const durationSlider = document.getElementById("durationSlider");
+      const durationValue = document.getElementById("durationValue");
+      const stateLabel = document.getElementById("stateLabel");
+      const meterFill = document.getElementById("meterFill");
+      const player = document.getElementById("player");
+      const emoteFace = document.getElementById("emoteFace");
+
+      const noiseSlider = document.getElementById("noiseSlider");
+      const echoSlider = document.getElementById("echoSlider");
+      const agcSlider = document.getElementById("agcSlider");
+      const gateSlider = document.getElementById("gateSlider");
+      const hotwordText = document.getElementById("hotwordText");
+      const hotwordTrain = document.getElementById("hotwordTrain");
+      const ttsVoice = document.getElementById("ttsVoice");
+      const clearLog = document.getElementById("clearLog");
+
+      let audioStream;
+      let audioContext;
+      let analyser;
+      let rmsStream;
+      let meterInterval;
+      let recording = false;
+      let listening = false;
+      let hotwordPattern = (localStorage.getItem("hotword") || "Hey Lyra").toLowerCase();
+      let lastTranscript = "";
+      let isMuted = false;
+
+      const log = (text) => {
+        const now = new Date().toLocaleTimeString();
+        logBox.textContent = `[${now}] ${text}` + "\n" + logBox.textContent;
+        const logPanel = document.getElementById("voice-log-panel");
+        if (logPanel) {
+          const p = document.createElement("div");
+          p.textContent = `[${now}] ${text}`;
+          if (logPanel.textContent.includes("Brak wpisów")) logPanel.textContent = "";
+          logPanel.prepend(p);
+        }
+        const chatEntries = document.getElementById("voice-chat-entries");
+        if (chatEntries) {
+          const p = document.createElement("div");
+          p.textContent = `[${now}] ${text}`;
+          if (chatEntries.textContent.includes("Brak wpisów")) chatEntries.textContent = "";
+          chatEntries.prepend(p);
+        }
+      };
+
+      const setState = (text, danger = false) => {
+        stateLabel.textContent = text;
+        stateLabel.style.background = danger ? "rgba(244, 63, 94, 0.2)" : "rgba(255, 255, 255, 0.1)";
+      };
+
+      const updateDurationLabel = () => {
+        durationValue.textContent = `${durationSlider.value} s`;
+      };
+
+      const updateSliderLabel = (slider, label) => {
+        label.textContent = `${slider.value}%`;
+      };
+
+      const initMeterStream = async () => {
+        if (rmsStream) return;
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          rmsStream = stream;
+          const ctx = new AudioContext();
+          const source = ctx.createMediaStreamSource(stream);
+          analyser = ctx.createAnalyser();
+          analyser.fftSize = 256;
+          source.connect(analyser);
+          const updateMeter = () => {
+            if (!analyser) return;
+            const data = new Float32Array(analyser.fftSize);
+            analyser.getFloatTimeDomainData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i++) {
+              sum += data[i] * data[i];
+            }
+            const rms = Math.sqrt(sum / data.length);
+            const gate = Math.max(0, gateSlider.value / 100);
+            const percent = Math.min(100, Math.max(0, (rms / (0.25 - gate * 0.15 + 0.02)) * 100));
+            meterFill.style.width = `${percent}%`;
+          };
+          meterInterval = setInterval(updateMeter, 70);
+        } catch (err) {
+          log(`Brak dostępu do audio: ${err?.message || err}`);
+        }
+      };
+
+      const stopMeter = () => {
+        clearInterval(meterInterval);
+        meterFill.style.width = "0";
+        analyser = null;
+      };
+
+      const startListening = async () => {
+        if (listening) return;
+        listening = true;
+        setState("Nasłuchuję (hotword)");
+        await initMeterStream();
+        detectHotword();
+      };
+
+      const stopListening = () => {
+        listening = false;
+      };
+
+      const detectHotword = () => {
+        if (!listening || !analyser) return;
+        const buffer = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(buffer);
+        const avg = buffer.reduce((acc, v) => acc + Math.abs(v), 0) / buffer.length;
+        if (avg > 0.02 && avg > gateSlider.value / 200) {
+          const transcript = hotwordText.value.toLowerCase();
+          if (transcript.includes(hotwordPattern)) {
+            log(`Hotword wykryty: ${hotwordPattern}`);
+            toggleRecording();
+          }
+        }
+        requestAnimationFrame(detectHotword);
+      };
+
+        const resolveVoice = async () => {
+          try {
+            const resp = await fetch("/api/tts/voices");
+            const { voices = [], default: def } = await resp.json();
+            const saved = localStorage.getItem("lyra_tts_voice") || "";
+            ttsVoice.innerHTML = "";
+            if (voices.length === 0) {
+              ttsVoice.innerHTML = "<option>Brak głosów</option>";
+              return;
+            }
+            voices.forEach((voice) => {
+              const opt = document.createElement("option");
+              opt.value = voice.id || voice;
+              opt.textContent = voice.label || voice.id || voice;
+              ttsVoice.appendChild(opt);
+            });
+            ttsVoice.value = saved || def || voices[0].id || voices[0];
+          } catch (err) {
+            ttsVoice.innerHTML = "<option>Brak połączenia</option>";
+          }
+        };
+
+      const startRecording = async () => {
+        if (recording) {
+          stopRecording();
+          return;
+        }
+        if (!navigator.mediaDevices) {
+          log("MediaDevices niedostępne");
+          return;
+        }
+        try {
+          const constraints = {
+            audio: {
+              echoCancellation: echoSlider.value > 50,
+              noiseSuppression: noiseSlider.value > 40,
+              autoGainControl: agcSlider.value > 40,
+            },
+          };
+          audioStream = await navigator.mediaDevices.getUserMedia(constraints);
+          audioContext = new AudioContext();
+          const recorder = new MediaRecorder(audioStream, { mimeType: "audio/webm" });
+          const chunks = [];
+          recorder.ondataavailable = (ev) => {
+            if (ev.data.size) {
+              chunks.push(ev.data);
+            }
+          };
+          recorder.onstop = async () => {
+            recording = false;
+            toggleBtn.setAttribute("aria-pressed", "false");
+            toggleBtn.textContent = "🎙 Włącz mikrofon";
+            setState("Przetwarzam…");
+            cleanupStream();
+            if (!chunks.length) {
+              log("Brak danych audio");
+              return;
+            }
+            const blob = new Blob(chunks, { type: "audio/webm" });
+            await sendAudio(blob);
+          };
+          recorder.start();
+          recording = true;
+          toggleBtn.setAttribute("aria-pressed", "true");
+          toggleBtn.textContent = "⏹️ Zakończ rozmowę";
+          setState("Nagrywam twoją wypowiedź");
+          log("Rozpoczęto rejestrację" + (isMuted ? " (wyciszone)" : ""));
+          const timeout = Number(durationSlider.value) || 12;
+          setTimeout(() => {
+            if (recording) {
+              stopRecording();
+              log("Limit czasu nagrania");
+            }
+          }, Math.min(timeout, 1000) * 1000);
+          stopListening();
+        } catch (err) {
+          log(`Błąd mikrofonu: ${err?.message || err}`);
+          setState("Brak mikrofonu", true);
+        }
+      };
+
+      const stopRecording = () => {
+        if (!recording) return;
+        recording = false;
+        if (audioStream) {
+          audioStream.getTracks().forEach((track) => track.stop());
+        }
+      };
+
+      const cleanupStream = () => {
+        if (audioStream) {
+          audioStream.getTracks().forEach((track) => track.stop());
+          audioStream = null;
+        }
+        if (audioContext) {
+          audioContext.close().catch(() => {});
+          audioContext = null;
+        }
+        stopMeter();
+      };
+
+      const sendAudio = async (blob) => {
+        const form = new FormData();
+        form.append("audio", blob, "voice.webm");
+        const voice = ttsVoice.value;
+        form.append("voice_selection", voice);
+        try {
+          const resp = await fetch("/voice", { method: "POST", body: form });
+          if (!resp.ok) throw new Error(await resp.text());
+          const transcript = resp.headers.get("X-Transcript") || "(brak)";
+          const reply = resp.headers.get("X-Llm-Reply") || "(brak)";
+          log(`Transkrypcja: ${transcript}`);
+          log(`Lyra: ${reply}`);
+          const wav = await resp.blob();
+          player.src = URL.createObjectURL(wav);
+          await player.play().catch(() => {});
+          setState("Lyra odpowiada");
+          emoteFace.textContent = "🗣️";
+        } catch (err) {
+          log(`Błąd połączenia: ${err?.message || err}`);
+          setState("Błąd", true);
+        } finally {
+          setTimeout(() => {
+            startListening();
+            emoteFace.textContent = "🎧";
+          }, 100);
+        }
+      };
+
+      durationSlider.addEventListener("input", updateDurationLabel);
+      noiseSlider.addEventListener("input", () => updateSliderLabel(noiseSlider, document.getElementById("noiseValue")));
+      echoSlider.addEventListener("input", () => updateSliderLabel(echoSlider, document.getElementById("echoValue")));
+      agcSlider.addEventListener("input", () => updateSliderLabel(agcSlider, document.getElementById("agcValue")));
+      gateSlider.addEventListener("input", () => updateSliderLabel(gateSlider, document.getElementById("gateValue")));
+      clearLog.addEventListener("click", () => (logBox.textContent = ""));
+      hotwordTrain.addEventListener("click", () => {
+        hotwordPattern = hotwordText.value.toLowerCase();
+        localStorage.setItem("hotword", hotwordPattern);
+        log(`Hotword ustawiony na ${hotwordPattern}`);
+      });
+      toggleBtn.addEventListener("click", () => {
+        if (recording) {
+          stopRecording();
+          toggleBtn.setAttribute("aria-pressed", "false");
+          toggleBtn.textContent = "🎙 Włącz mikrofon";
+        } else {
+          startRecording();
+        }
+      });
+      ttsVoice.addEventListener("change", () => {
+        localStorage.setItem("lyra_tts_voice", ttsVoice.value || "");
+      });
+      muteBtn.addEventListener("click", () => {
+        isMuted = !isMuted;
+        muteBtn.textContent = isMuted ? "Mute (włączony)" : "Mute";
+        muteBtn.classList.toggle("primary", isMuted);
+      });
+
+      const init = async () => {
+        updateDurationLabel();
+        await resolveVoice();
+        setState("Gotowe do nagrania");
+        startListening();
+      };
+
+      init();
+    </script>
+  </body>
+</html>
