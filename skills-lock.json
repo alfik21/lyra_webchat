@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-teams-simplify-and-harden": {
+      "source": "pskoett/pskoett-ai-skills",
+      "sourceType": "github",
+      "computedHash": "861f87dd3d0ff9035315b59af80337d967b60580e667b932835dc2a01ad51219"
+    }
+  }
+}

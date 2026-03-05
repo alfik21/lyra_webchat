@@ -1,0 +1,41 @@
+/* Fix UI: font fallbacks and chat visibility overrides */
+:root {
+  --lyra-font-stack: "Noto Sans", "DejaVu Sans", "Liberation Sans", "Segoe UI", "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  --lyra-text-color: #c7d2e2;
+}
+html, body, #root {
+  font-family: var(--lyra-font-stack);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Chat message visibility fixes */
+#messages-list, .messages-list, .chat, .chat-bubble, .chat-message, .message {
+  display: block !important;
+  color: var(--lyra-text-color) !important;
+  background-clip: padding-box;
+}
+
+#lyra-debug-log {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: auto;
+  bottom: auto;
+  width: 360px;
+  max-width: 40vw;
+  max-height: 30vh;
+  overflow: auto;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+/* If some element accidentally set opacity/visibility */
+.chat-bubble, .message, .chat-message {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Ensure debug panel not blocking small action buttons */
+#lyra-debug-log { pointer-events: auto; }

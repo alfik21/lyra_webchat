@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lyra — rozmowa głosowa</title>
+    <link rel="stylesheet" href="/fix-ui.css">
     <style>
       :root {
         --bg: #030712;
@@ -236,14 +237,14 @@
           <div class="emote" id="emoteFace">🎧</div>
         </header>
         <div class="row" style="margin-top: 16px; gap: 12px;">
-          <button id="openMicBtn" class="btn primary" aria-pressed="false">🎙 Włącz mikrofon</button>
+          <button type="button" id="openMicBtn" class="btn primary" aria-pressed="false">🎙 Włącz mikrofon</button>
           <div class="status-pill" id="stateLabel">Gotowe do nagrania</div>
         </div>
         <div class="row" style="margin-top: 12px; gap: 12px;">
           <span style="color: var(--muted);">Długość wypowiedzi:</span>
           <input id="durationSlider" type="range" min="2" max="1000" value="12" />
           <span class="slider-value" id="durationValue">12 s</span>
-          <button class="btn secondary" id="muteBtn">Mute</button>
+          <button type="button" class="btn secondary" id="muteBtn">Mute</button>
         </div>
         <div class="panel">
           <h2 style="font-size: 1.1rem;">Sterowanie filtrami</h2>
@@ -280,15 +281,33 @@
         </div>
         <div class="panel">
           <div class="row" style="justify-content: space-between; align-items: center;">
-            <div>
-              <label for="ttsVoice" style="font-size: 0.9rem; color: var(--muted);">Wybór głosu TTS</label>
-              <select id="ttsVoice"></select>
+            <div class="tts-settings">
+              <label for="tts-voice" style="font-size: 0.9rem; color: var(--muted);">Głos:</label>
+              <select id="tts-voice">
+                <option value="piper-pl-female">Polski – Kobieta</option>
+                <option value="piper-pl-male">Polski – Mężczyzna</option>
+                <option value="system">System TTS</option>
+                <option value="off">Wyłącz</option>
+              </select>
+              <label for="tts-style" style="font-size: 0.9rem; color: var(--muted); margin-top: 8px; display: block;">Styl emocji:</label>
+              <select id="tts-style">
+                <option value="neutral">Neutral</option>
+                <option value="assistant">Assistant</option>
+                <option value="calm">Calm</option>
+                <option value="energetic">Energetic</option>
+              </select>
+              <label for="tts-rate" style="font-size: 0.9rem; color: var(--muted); margin-top: 8px; display: block;">Tempo mowy</label>
+              <input id="tts-rate" type="range" min="0.6" max="1.8" step="0.1" value="1.0" />
+              <span class="slider-value" id="tts-rate-value">1.0x</span>
+              <label for="tts-pitch" style="font-size: 0.9rem; color: var(--muted); margin-top: 8px; display: block;">Pitch</label>
+              <input id="tts-pitch" type="range" min="0.5" max="2.0" step="0.1" value="1.0" />
+              <span class="slider-value" id="tts-pitch-value">1.0</span>
             </div>
             <div>
               <label style="font-size: 0.85rem; color: var(--muted);">Hotword</label>
               <div class="row" style="gap: 8px;">
                 <input type="text" id="hotwordText" value="Hey Lyra" style="width: 160px;" />
-                <button class="btn secondary" id="hotwordTrain">Zapisz</button>
+                <button type="button" class="btn secondary" id="hotwordTrain">Zapisz</button>
               </div>
             </div>
           </div>
@@ -305,7 +324,7 @@
         <div class="panel" style="display:block;">
           <div class="row" style="justify-content: space-between; align-items:center;">
             <span>Logi rozmowy</span>
-            <button id="clearLog" class="btn secondary">Wyczyść</button>
+            <button type="button" id="clearLog" class="btn secondary">Wyczyść</button>
           </div>
           <div id="logBox">Logi pojawią się tutaj.</div>
           <h2 style="font-size: 1rem; margin: 12px 0 6px;">Panel pomocniczy</h2>
@@ -315,11 +334,26 @@
             <div id="voice-chat-entries" aria-live="polite">(Brak wpisów czatu głosowego)</div>
           </div>
         </div>
-        <audio id="player" controls></audio>
+        <audio id="player" controls>
+          <track kind="captions" srclang="pl" label="Polski" src="data:text/vtt,WEBVTT" default />
+        </audio>
       </div>
     </main>
     <script>
       const toggleBtn = document.getElementById("openMicBtn");
+      // Hidden file input fallback for environments without getUserMedia (or permissions over HTTP)
+      const fileInputFallback = document.createElement('input');
+      fileInputFallback.type = 'file';
+      fileInputFallback.accept = 'audio/*';
+      fileInputFallback.capture = 'microphone';
+      fileInputFallback.style.display = 'none';
+      fileInputFallback.addEventListener('change', async (ev) => {
+        const f = ev.target?.files?.[0];
+        if (!f) return;
+        log('Wybrano plik audio (fallback) — przesyłanie...');
+        await sendAudio(f);
+      });
+      document.body.appendChild(fileInputFallback);
       const muteBtn = document.getElementById("muteBtn");
       const logBox = document.getElementById("logBox");
       const durationSlider = document.getElementById("durationSlider");
@@ -335,7 +369,12 @@
       const gateSlider = document.getElementById("gateSlider");
       const hotwordText = document.getElementById("hotwordText");
       const hotwordTrain = document.getElementById("hotwordTrain");
-      const ttsVoice = document.getElementById("ttsVoice");
+      const ttsVoice = document.getElementById("tts-voice");
+      const ttsStyle = document.getElementById("tts-style");
+      const ttsRate = document.getElementById("tts-rate");
+      const ttsPitch = document.getElementById("tts-pitch");
+      const ttsRateValue = document.getElementById("tts-rate-value");
+      const ttsPitchValue = document.getElementById("tts-pitch-value");
       const clearLog = document.getElementById("clearLog");
 
       let audioStream;
@@ -346,12 +385,55 @@
       let recording = false;
       let listening = false;
       let hotwordPattern = (localStorage.getItem("hotword") || "Hey Lyra").toLowerCase();
-      let lastTranscript = "";
       let isMuted = false;
+
+      const TTS_RATE_KEY = "tts_rate";
+      const TTS_PITCH_KEY = "tts_pitch";
+      const TTS_STYLE_KEY = "tts_style";
+
+      const clamp = (value, min, max, fallback) => {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return fallback;
+        return Math.min(max, Math.max(min, n));
+      };
+
+      const getTtsSettings = () => ({
+        voice: (ttsVoice.value || "piper-pl-female").trim() || "piper-pl-female",
+        style: (ttsStyle.value || "neutral").trim() || "neutral",
+        rate: clamp(ttsRate.value, 0.6, 1.8, 1.0),
+        pitch: clamp(ttsPitch.value, 0.5, 2.0, 1.0),
+      });
+
+      const updateTtsLabels = () => {
+        ttsRateValue.textContent = `${clamp(ttsRate.value, 0.6, 1.8, 1.0).toFixed(1)}x`;
+        ttsPitchValue.textContent = `${clamp(ttsPitch.value, 0.5, 2.0, 1.0).toFixed(1)}`;
+      };
+
+      const persistTtsSettings = () => {
+        const tts = getTtsSettings();
+        localStorage.setItem("tts_voice", tts.voice);
+        localStorage.setItem("lyra_tts_voice", tts.voice);
+        localStorage.setItem(TTS_STYLE_KEY, tts.style);
+        localStorage.setItem(TTS_RATE_KEY, String(tts.rate));
+        localStorage.setItem(TTS_PITCH_KEY, String(tts.pitch));
+        updateTtsLabels();
+      };
+
+      const loadTtsSettings = () => {
+        const savedVoice = localStorage.getItem("tts_voice") || localStorage.getItem("lyra_tts_voice");
+        const savedStyle = localStorage.getItem(TTS_STYLE_KEY);
+        const savedRate = localStorage.getItem(TTS_RATE_KEY);
+        const savedPitch = localStorage.getItem(TTS_PITCH_KEY);
+        if (savedVoice) ttsVoice.value = savedVoice;
+        if (savedStyle) ttsStyle.value = savedStyle;
+        ttsRate.value = String(clamp(savedRate, 0.6, 1.8, 1.0));
+        ttsPitch.value = String(clamp(savedPitch, 0.5, 2.0, 1.0));
+        updateTtsLabels();
+      };
 
       const log = (text) => {
         const now = new Date().toLocaleTimeString();
-        logBox.textContent = `[${now}] ${text}` + "\n" + logBox.textContent;
+        logBox.textContent = `[${now}] ${text}\n${logBox.textContent}`;
         const logPanel = document.getElementById("voice-log-panel");
         if (logPanel) {
           const p = document.createElement("div");
@@ -406,7 +488,7 @@
           };
           meterInterval = setInterval(updateMeter, 70);
         } catch (err) {
-          log(`Brak dostępu do audio: ${err?.message || err}`);
+          log(`Brak dostępu do audio: ${err?.message ?? err}`);
         }
       };
 
@@ -437,31 +519,82 @@
           const transcript = hotwordText.value.toLowerCase();
           if (transcript.includes(hotwordPattern)) {
             log(`Hotword wykryty: ${hotwordPattern}`);
-            toggleRecording();
+            triggerHotword("local-detector");
           }
         }
         requestAnimationFrame(detectHotword);
       };
 
+      const triggerHotword = async (source = "ui") => {
+        try {
+          await fetch("/hotword_trigger", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source, timestamp: new Date().toISOString() }),
+          });
+        } catch (_) {
+          // no-op: trigger still starts local recording
+        }
+        if (!recording) {
+          await startRecording();
+        }
+      };
+
+      window.lyraHotwordTrigger = (source = "window-hook") => triggerHotword(source);
+      window.addEventListener("lyra:hotword-trigger", () => {
+        triggerHotword("window-event");
+      });
+
         const resolveVoice = async () => {
           try {
-            const resp = await fetch("/api/tts/voices");
-            const { voices = [], default: def } = await resp.json();
-            const saved = localStorage.getItem("lyra_tts_voice") || "";
-            ttsVoice.innerHTML = "";
-            if (voices.length === 0) {
-              ttsVoice.innerHTML = "<option>Brak głosów</option>";
+            // Prefer unified /api/tts/get which our proxy exposes
+            const resp = await fetch('/api/tts/get');
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            const saved = localStorage.getItem('tts_voice') || localStorage.getItem('lyra_tts_voice') || '';
+            const existingValues = new Set(Array.from(ttsVoice.options).map((opt) => opt.value));
+
+            // Normalize possible shapes: {voices: [...]}, {voices: {engine: [...]}} or {engines: [...], voices: {engine: [...]}}
+            let list = [];
+            if (Array.isArray(data.voices)) {
+              list = data.voices;
+            } else if (data.voices && typeof data.voices === 'object') {
+              const engine = data.tts?.engine || data.engines?.[0] || Object.keys(data.voices)[0];
+              if (engine && Array.isArray(data.voices[engine])) list = data.voices[engine];
+              else list = Object.values(data.voices).flat().filter(Boolean);
+            } else if (Array.isArray(data.engines) && data.engines.length && data.available) {
+              list = (data.available && Array.isArray(data.available)) ? data.available : [];
+            }
+
+            if (!list || !list.length) {
+              if (!ttsVoice.options.length) {
+                ttsVoice.innerHTML = '<option>Brak głosów</option>';
+              }
               return;
             }
-            voices.forEach((voice) => {
-              const opt = document.createElement("option");
-              opt.value = voice.id || voice;
-              opt.textContent = voice.label || voice.id || voice;
-              ttsVoice.appendChild(opt);
+
+            list.forEach((voice) => {
+              const opt = document.createElement('option');
+              if (typeof voice === 'string') {
+                opt.value = voice;
+                opt.textContent = voice;
+              } else {
+                opt.value = voice.id || voice;
+                opt.textContent = voice.label || voice.id || (voice.name || JSON.stringify(voice)).slice(0,40);
+              }
+              if (!existingValues.has(opt.value)) {
+                ttsVoice.appendChild(opt);
+                existingValues.add(opt.value);
+              }
             });
-            ttsVoice.value = saved || def || voices[0].id || voices[0];
+
+            const def = data.tts?.voice || list[0]?.id || list[0];
+            const fallback = saved || def || ttsVoice.options[0]?.value;
+            if (fallback) ttsVoice.value = fallback;
           } catch (err) {
-            ttsVoice.innerHTML = "<option>Brak połączenia</option>";
+            if (!ttsVoice.options.length) {
+              ttsVoice.innerHTML = '<option>Brak połączenia</option>';
+            }
           }
         };
 
@@ -470,8 +603,10 @@
           stopRecording();
           return;
         }
-        if (!navigator.mediaDevices) {
-          log("MediaDevices niedostępne");
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          // Fallback: trigger file input to allow recording via native camera UI on HTTP or unsupported browsers
+          log('getUserMedia niedostępne — używam fallbacku z uploadem pliku audio');
+          fileInputFallback.click();
           return;
         }
         try {
@@ -484,7 +619,9 @@
           };
           audioStream = await navigator.mediaDevices.getUserMedia(constraints);
           audioContext = new AudioContext();
-          const recorder = new MediaRecorder(audioStream, { mimeType: "audio/webm" });
+          const preferred = ["audio/ogg;codecs=opus", "audio/webm;codecs=opus", "audio/webm"];
+          const mimeType = preferred.find((type) => window.MediaRecorder?.isTypeSupported?.(type)) || "audio/webm";
+          const recorder = new MediaRecorder(audioStream, { mimeType });
           const chunks = [];
           recorder.ondataavailable = (ev) => {
             if (ev.data.size) {
@@ -501,7 +638,7 @@
               log("Brak danych audio");
               return;
             }
-            const blob = new Blob(chunks, { type: "audio/webm" });
+            const blob = new Blob(chunks, { type: mimeType });
             await sendAudio(blob);
           };
           recorder.start();
@@ -509,7 +646,7 @@
           toggleBtn.setAttribute("aria-pressed", "true");
           toggleBtn.textContent = "⏹️ Zakończ rozmowę";
           setState("Nagrywam twoją wypowiedź");
-          log("Rozpoczęto rejestrację" + (isMuted ? " (wyciszone)" : ""));
+          log(`Rozpoczęto rejestrację${isMuted ? " (wyciszone)" : ""}`);
           const timeout = Number(durationSlider.value) || 12;
           setTimeout(() => {
             if (recording) {
@@ -519,7 +656,7 @@
           }, Math.min(timeout, 1000) * 1000);
           stopListening();
         } catch (err) {
-          log(`Błąd mikrofonu: ${err?.message || err}`);
+          log(`Błąd mikrofonu: ${err?.message ?? err}`);
           setState("Brak mikrofonu", true);
         }
       };
@@ -528,13 +665,13 @@
         if (!recording) return;
         recording = false;
         if (audioStream) {
-          audioStream.getTracks().forEach((track) => track.stop());
+          audioStream.getTracks().forEach((track) => { track.stop(); });
         }
       };
 
       const cleanupStream = () => {
         if (audioStream) {
-          audioStream.getTracks().forEach((track) => track.stop());
+          audioStream.getTracks().forEach((track) => { track.stop(); });
           audioStream = null;
         }
         if (audioContext) {
@@ -545,24 +682,85 @@
       };
 
       const sendAudio = async (blob) => {
+        const tts = getTtsSettings();
+        const ext = (blob.type || "").includes("ogg") ? "ogg" : "wav";
         const form = new FormData();
-        form.append("audio", blob, "voice.webm");
-        const voice = ttsVoice.value;
-        form.append("voice_selection", voice);
+        form.append("audio", blob, `voice.${ext}`);
         try {
-          const resp = await fetch("/voice", { method: "POST", body: form });
-          if (!resp.ok) throw new Error(await resp.text());
-          const transcript = resp.headers.get("X-Transcript") || "(brak)";
-          const reply = resp.headers.get("X-Llm-Reply") || "(brak)";
+          const asrResp = await fetch("/api/asr", { method: "POST", body: form });
+          const asrData = await asrResp.json().catch(() => ({}));
+          if (!asrResp.ok) {
+            throw new Error(asrData.error || asrData.detail || "ASR request failed");
+          }
+          const transcript = (asrData.transcription || "").trim();
+          if (!transcript) {
+            throw new Error("Pusta transkrypcja z /api/asr");
+          }
           log(`Transkrypcja: ${transcript}`);
+
+          const chatPayload = {
+            model: "bielik",
+            stream: false,
+            messages: [{ role: "user", content: transcript }],
+            tts_voice: tts.voice,
+            tts_rate: tts.rate,
+            tts_pitch: tts.pitch,
+            tts_style: tts.style,
+          };
+          const chatResp = await fetch("/v1/chat/completions", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(chatPayload),
+          });
+          const chatData = await chatResp.json().catch(() => ({}));
+          if (!chatResp.ok) {
+            throw new Error(chatData.error || "Chat completion failed");
+          }
+          const reply = (chatData?.choices?.[0]?.message?.content || "").trim();
+          if (!reply) {
+            throw new Error("Pusta odpowiedz czatu");
+          }
           log(`Lyra: ${reply}`);
-          const wav = await resp.blob();
+
+          if (tts.voice === "off") {
+            setState("Odpowiedz gotowa (TTS OFF)");
+            return;
+          }
+
+          if (tts.voice === "system") {
+            const utt = new SpeechSynthesisUtterance(reply);
+            utt.lang = "pl-PL";
+            utt.rate = tts.rate;
+            utt.pitch = tts.pitch;
+            window.speechSynthesis.cancel();
+            window.speechSynthesis.speak(utt);
+            setState("Lyra odpowiada (system TTS)");
+            emoteFace.textContent = "🗣️";
+            return;
+          }
+
+          const ttsResp = await fetch("/api/tts", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              text: reply,
+              voice: tts.voice,
+              tts_rate: tts.rate,
+              tts_pitch: tts.pitch,
+              tts_style: tts.style,
+            }),
+          });
+          if (!ttsResp.ok) {
+            const ttsErr = await ttsResp.json().catch(() => ({}));
+            throw new Error(ttsErr.error || ttsErr.detail || "TTS failed");
+          }
+          const wav = await ttsResp.blob();
           player.src = URL.createObjectURL(wav);
           await player.play().catch(() => {});
           setState("Lyra odpowiada");
           emoteFace.textContent = "🗣️";
         } catch (err) {
-          log(`Błąd połączenia: ${err?.message || err}`);
+          log(`Błąd połączenia: ${err?.message ?? err}`);
           setState("Błąd", true);
         } finally {
           setTimeout(() => {
@@ -593,8 +791,11 @@
         }
       });
       ttsVoice.addEventListener("change", () => {
-        localStorage.setItem("lyra_tts_voice", ttsVoice.value || "");
+        persistTtsSettings();
       });
+      ttsStyle.addEventListener("change", persistTtsSettings);
+      ttsRate.addEventListener("input", persistTtsSettings);
+      ttsPitch.addEventListener("input", persistTtsSettings);
       muteBtn.addEventListener("click", () => {
         isMuted = !isMuted;
         muteBtn.textContent = isMuted ? "Mute (włączony)" : "Mute";
@@ -603,7 +804,9 @@
 
       const init = async () => {
         updateDurationLabel();
+        loadTtsSettings();
         await resolveVoice();
+        loadTtsSettings();
         setState("Gotowe do nagrania");
         startListening();
       };

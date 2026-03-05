@@ -209,6 +209,16 @@ const Hero = () => {
         </div>
       )}
 
+      {/* Quick Access Buttons */}
+      <div className="absolute bottom-48 left-0 right-0 flex justify-center gap-4 z-20 flex-wrap px-4">
+        <a href="/chat" className="px-4 py-2 bg-white/10 text-white text-xs uppercase tracking-wider rounded-full hover:bg-pink hover:text-black transition-all">💬 Czat AI</a>
+        <a href="/voice.html" className="px-4 py-2 bg-white/10 text-white text-xs uppercase tracking-wider rounded-full hover:bg-pink hover:text-black transition-all">🎙️ Voice</a>
+        <a href="/llama.html" className="px-4 py-2 bg-white/10 text-white text-xs uppercase tracking-wider rounded-full hover:bg-pink hover:text-black transition-all">🦙 Llama</a>
+        <a href="/tts.html" className="px-4 py-2 bg-white/10 text-white text-xs uppercase tracking-wider rounded-full hover:bg-pink hover:text-black transition-all">🔊 TTS</a>
+        <a href="/fusion.html" className="px-4 py-2 bg-white/10 text-white text-xs uppercase tracking-wider rounded-full hover:bg-pink hover:text-black transition-all">⚡ Fusion</a>
+        <a href="/settings.html" className="px-4 py-2 bg-white/10 text-white text-xs uppercase tracking-wider rounded-full hover:bg-pink hover:text-black transition-all">⚙️ Settings</a>
+      </div>
+
       {/* Corner decorations */}
       <div className="absolute top-24 left-6 w-16 h-16 border-l-2 border-t-2 border-pink/30 z-20" />
       <div className="absolute bottom-24 right-6 w-16 h-16 border-r-2 border-b-2 border-pink/30 z-20" />

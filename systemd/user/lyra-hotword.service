@@ -1,0 +1,17 @@
+[Unit]
+Description=Lyra Hotword (openWakeWord)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/lyra_webchat
+Environment=PYTHONUNBUFFERED=1
+Environment=LYRA_HOTWORD_TRIGGER_URL=http://127.0.0.1:11447/hotword_trigger
+ExecStart=/usr/bin/python3 %h/lyra_webchat/hotword_server.py
+Restart=always
+RestartSec=1
+StandardOutput=append:/tmp/lyra_hotword_systemd.log
+StandardError=append:/tmp/lyra_hotword_systemd.log
+
+[Install]
+WantedBy=default.target

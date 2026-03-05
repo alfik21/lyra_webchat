@@ -34,7 +34,7 @@ def start_voice_session():
 def stop_voice_session():
     session_id = request.args.get("session_id") or (request.get_json(silent=True) or {}).get("session_id")
     if not session_id:
-        return {"ok": False, "error": "Brak session_id"}, 400
+        return jsonify({"ok": False, "error": "Brak session_id"}), 400
     AgentBridge.stop(session_id)
-    return {"ok": True}
+    return jsonify({"ok": True})
 

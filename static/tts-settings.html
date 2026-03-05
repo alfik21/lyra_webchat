@@ -89,7 +89,7 @@
 
     function log(msg) {
       const now = new Date().toLocaleTimeString();
-      logBox.textContent = `[${now}] ${msg}\\n` + logBox.textContent;
+      logBox.textContent = `[${now}] ${msg}\n` + logBox.textContent;
     }
     async function fetchJson(path, opts={}) {
       const resp = await fetch(API_BASE + path, opts);
@@ -157,7 +157,6 @@
           body: JSON.stringify(payload),
         });
         log("Test: " + JSON.stringify(data));
-        // Pobierz plik i odtwórz
         const wav = await fetch(API_BASE + "/file");
         if (wav.ok) {
           const blob = await wav.blob();

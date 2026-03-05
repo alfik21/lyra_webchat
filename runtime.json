@@ -1,0 +1,15 @@
+{
+  "config": {
+    "input_mode": "chat",
+    "humor_level": 5,
+    "intel_level": 10,
+    "tools_allowed": [
+      "tts",
+      "voice",
+      "camera",
+      "fusion",
+      "llama",
+      "remote_camera"
+    ]
+  }
+}
